@@ -34,6 +34,7 @@ function connect(options: { drop?: boolean } = {}) {
 }
 
 const config: HubConfig = {
+  peripherals: [{ hardwareId: "placar-01", type: "PLACAR" }],
   playingAreaId: null,
   heartbeatSeconds: 30,
   cameras: [

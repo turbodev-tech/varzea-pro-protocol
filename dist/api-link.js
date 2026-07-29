@@ -22,6 +22,15 @@ exports.cameraSchema = zod_1.z.object({
 exports.hubConfigSchema = zod_1.z.object({
     playingAreaId: zod_1.z.string().nullable(),
     heartbeatSeconds: zod_1.z.number().int().positive(),
+    /**
+     * Every peripheral registered against this hub — the authoritative set.
+     *
+     * The hub refuses anything not on this list at the door, so an unregistered
+     * device is turned away rather than having its events queued for an owner who
+     * may never register it. Cameras appear here too; `cameras` below carries the
+     * extra detail needed to actually pull their video.
+     */
+    peripherals: zod_1.z.array(shared_1.peripheralSchema),
     cameras: zod_1.z.array(exports.cameraSchema),
 });
 exports.apiLinkMessages = {

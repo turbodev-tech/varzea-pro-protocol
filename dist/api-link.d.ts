@@ -19,6 +19,15 @@ export type Camera = z.infer<typeof cameraSchema>;
 export declare const hubConfigSchema: z.ZodObject<{
     playingAreaId: z.ZodNullable<z.ZodString>;
     heartbeatSeconds: z.ZodNumber;
+    peripherals: z.ZodArray<z.ZodObject<{
+        hardwareId: z.ZodString;
+        type: z.ZodEnum<{
+            CAMERA: "CAMERA";
+            PLACAR: "PLACAR";
+        }>;
+        label: z.ZodOptional<z.ZodString>;
+        firmwareVersion: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
     cameras: z.ZodArray<z.ZodObject<{
         hardwareId: z.ZodString;
         host: z.ZodString;
@@ -49,6 +58,15 @@ export declare const apiLinkMessages: {
         config: z.ZodObject<{
             playingAreaId: z.ZodNullable<z.ZodString>;
             heartbeatSeconds: z.ZodNumber;
+            peripherals: z.ZodArray<z.ZodObject<{
+                hardwareId: z.ZodString;
+                type: z.ZodEnum<{
+                    CAMERA: "CAMERA";
+                    PLACAR: "PLACAR";
+                }>;
+                label: z.ZodOptional<z.ZodString>;
+                firmwareVersion: z.ZodOptional<z.ZodString>;
+            }, z.core.$strip>>;
             cameras: z.ZodArray<z.ZodObject<{
                 hardwareId: z.ZodString;
                 host: z.ZodString;
@@ -142,6 +160,15 @@ export declare const apiLinkMessages: {
     readonly 'api.config': import("./envelope").MessageSpec<z.ZodObject<{
         playingAreaId: z.ZodNullable<z.ZodString>;
         heartbeatSeconds: z.ZodNumber;
+        peripherals: z.ZodArray<z.ZodObject<{
+            hardwareId: z.ZodString;
+            type: z.ZodEnum<{
+                CAMERA: "CAMERA";
+                PLACAR: "PLACAR";
+            }>;
+            label: z.ZodOptional<z.ZodString>;
+            firmwareVersion: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>;
         cameras: z.ZodArray<z.ZodObject<{
             hardwareId: z.ZodString;
             host: z.ZodString;

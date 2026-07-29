@@ -23,6 +23,15 @@ export type Camera = z.infer<typeof cameraSchema>;
 export const hubConfigSchema = z.object({
   playingAreaId: z.string().nullable(),
   heartbeatSeconds: z.number().int().positive(),
+  /**
+   * Every peripheral registered against this hub — the authoritative set.
+   *
+   * The hub refuses anything not on this list at the door, so an unregistered
+   * device is turned away rather than having its events queued for an owner who
+   * may never register it. Cameras appear here too; `cameras` below carries the
+   * extra detail needed to actually pull their video.
+   */
+  peripherals: z.array(peripheralSchema),
   cameras: z.array(cameraSchema),
 });
 export type HubConfig = z.infer<typeof hubConfigSchema>;
