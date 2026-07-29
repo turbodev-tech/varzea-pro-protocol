@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json --noEmit && node --import tsx --test src/*.test.ts"
+    "test": "tsc -p tsconfig.json --noEmit && node --import tsx --test src/*.test.ts && npm run verify:dist",
+    "verify:dist": "npm run build && git diff --quiet -- dist || (echo 'dist is stale — commit the rebuild' && exit 1)"
   },
   "peerDependencies": {
     "zod": "^4.0.0"
