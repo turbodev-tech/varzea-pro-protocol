@@ -18,8 +18,16 @@ export const envelopeSchema = z.object({
   v: z.literal(PROTOCOL_VERSION),
   id: z.string().min(1),
   type: z.string().min(1),
-  /** Sender's clock when the message was written, ISO-8601. */
-  sentAt: z.string(),
+  /**
+   * Sender's clock when the message was written, ISO-8601.
+   *
+   * Optional because not every sender has one. An ESP32 has no real-time clock
+   * and cannot produce a real timestamp, so it omits the field rather than
+   * inventing a value that reads like a date and is not. Nothing depends on it:
+   * it exists to make a captured frame self-describing, and event times are
+   * carried explicitly by the messages that need them.
+   */
+  sentAt: z.string().optional(),
   replyTo: z.string().min(1).optional(),
   payload: z.unknown(),
 });
