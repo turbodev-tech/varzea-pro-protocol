@@ -17,6 +17,28 @@ export const peripheralSchema = z.object({
 });
 export type Peripheral = z.infer<typeof peripheralSchema>;
 
+/**
+ * A camera's hardwareId is its MAC: 12 lowercase hex digits, no separators.
+ *
+ * Colons would fail the API's hardwareId rule and end up in R2 keys, and the
+ * case has to be fixed so the hub and the API derive the same id from the same
+ * camera, byte for byte.
+ */
+export const macHardwareIdSchema = z
+  .string()
+  .regex(/^[0-9a-f]{12}$/, 'expected a MAC as 12 lowercase hex digits');
+
+/**
+ * `F0:00:06:21:CD:6E`, `f0-00-06-21-cd-6e` or `F0000621CD6E` → `f0000621cd6e`.
+ *
+ * Only separators are stripped. Anything else that is not hex means the input
+ * was not a MAC, and returns null rather than being quietly coerced into one.
+ */
+export function normaliseMac(input: string): string | null {
+  const bare = input.replace(/[:\-.\s]/g, '').toLowerCase();
+  return /^[0-9a-f]{12}$/.test(bare) ? bare : null;
+}
+
 /** Arbitrary JSON bag carried alongside events and commands. */
 export const dataSchema = z.record(z.string(), z.unknown());
 

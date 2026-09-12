@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { apiLinkMessages, type HubConfig } from './api-link';
+import {
+  apiLinkMessages,
+  discoveredCameraSchema,
+  hubConfigSchema,
+  type HubConfig,
+} from './api-link';
 import { Channel, ProtocolError } from './channel';
+import { normaliseMac } from './shared';
 
 /**
  * Runs both ends of the API link in-process, wired to each other. No sockets,
@@ -38,7 +44,7 @@ const config: HubConfig = {
   playingAreaId: null,
   heartbeatSeconds: 30,
   cameras: [
-    { hardwareId: 'cam1', host: '10.0.0.9', rtspPort: 554, rtspPath: '/live/0/MAIN', record: true },
+    { hardwareId: 'f0000621cd6e', rtspPort: 554, rtspPath: '/stream0', record: true },
   ],
 };
 
@@ -224,5 +230,76 @@ describe('Channel', () => {
     assert.equal(warnings.length, 2);
     assert.match(warnings[0] ?? '', /not JSON/);
     assert.match(warnings[1] ?? '', /malformed envelope/);
+  });
+});
+
+describe('camera addressing', () => {
+  it('drops a host sent by a 1.x API instead of rejecting the config', () => {
+    // Rollout order is hub first, so a v2 hub will meet a v1 API.
+    const legacy = {
+      ...config,
+      cameras: [{ ...config.cameras[0], host: '192.168.50.102' }],
+    };
+    const parsed = hubConfigSchema.parse(legacy);
+    assert.equal('host' in (parsed.cameras[0] ?? {}), false);
+  });
+
+  it('keeps a config whose camera id is not a MAC', () => {
+    // One legacy row must not cost the hub its placar list.
+    const parsed = hubConfigSchema.parse({
+      ...config,
+      cameras: [{ hardwareId: 'CAM001', rtspPath: '/live/0/MAIN' }],
+    });
+    assert.equal(parsed.peripherals.length, 1);
+  });
+
+  it('normalises every common MAC spelling to one id', () => {
+    for (const spelling of [
+      'F0:00:06:21:CD:6E',
+      'f0-00-06-21-cd-6e',
+      'F0000621CD6E',
+      'f000.0621.cd6e',
+    ]) {
+      assert.equal(normaliseMac(spelling), 'f0000621cd6e');
+    }
+  });
+
+  it('refuses to coerce a non-MAC into one', () => {
+    assert.equal(normaliseMac('urn:uuid:1419d68a-1dd2-11b2-a105-F0000621CD6E'), null);
+    assert.equal(normaliseMac('ZZ:00:06:21:CD:6E'), null);
+    assert.equal(normaliseMac('F0:00:06:21:CD'), null);
+  });
+
+  it('only accepts discovered cameras identified by a normalised MAC', () => {
+    const camera = {
+      hardwareId: 'f0000621cd6e',
+      mac: 'F0:00:06:21:CD:6E',
+      host: '10.1.1.246',
+      model: 'MCD80A',
+      lastSeenAt: new Date().toISOString(),
+      profiles: [{ name: 'MainStream', rtspPath: '/stream0', width: 4096, height: 1944 }],
+    };
+    assert.equal(discoveredCameraSchema.safeParse(camera).success, true);
+    assert.equal(
+      discoveredCameraSchema.safeParse({ ...camera, hardwareId: 'F0:00:06:21:CD:6E' }).success,
+      false,
+    );
+  });
+
+  it('answers a discovery request with the fresh list', async () => {
+    const { hub, api } = connect();
+    hub.on('api.cameras.discover', () => ({
+      cameras: [
+        {
+          hardwareId: 'f0000621cd6e',
+          mac: 'F0:00:06:21:CD:6E',
+          host: '10.1.1.246',
+          lastSeenAt: new Date().toISOString(),
+        },
+      ],
+    }));
+
+    const reply = await api.ask('api.cameras.discover', {});
+    assert.equal(reply.cameras[0]?.host, '10.1.1.246');
   });
 });

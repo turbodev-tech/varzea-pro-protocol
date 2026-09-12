@@ -1,16 +1,33 @@
 import { z } from 'zod';
 import { define, type PayloadOf, type ReplyOf } from './envelope';
-import { dataSchema, logLevelSchema, peripheralSchema } from './shared';
+import {
+  dataSchema,
+  logLevelSchema,
+  macHardwareIdSchema,
+  peripheralSchema,
+} from './shared';
 
 /**
  * The hub's link to the API. The hub is the WebSocket client; the API is the
  * server. `hub.*` is sent by the hub, `api.*` by the API.
  */
 
-/** One camera the hub should pull and record. `hardwareId` is the MediaMTX path name. */
+/**
+ * One camera the hub should pull and record. `hardwareId` is the MediaMTX path
+ * name.
+ *
+ * There is deliberately no address. Fields are wired and addressed by the
+ * arena router's DHCP, so an IP is something only the hub can know: it finds
+ * cameras by ONVIF discovery and resolves `hardwareId` (the MAC) to an address
+ * itself. Identity lives in the API; address lives in the hub.
+ *
+ * `hardwareId` is not validated as a MAC here, on purpose. This schema sits
+ * inside `api.config`, and one bad camera row would then reject the whole
+ * config — including the placar list scoring depends on. A camera the hub
+ * cannot match to a discovered MAC is reported as unresolved instead.
+ */
 export const cameraSchema = z.object({
   hardwareId: z.string().min(1),
-  host: z.string().min(1),
   rtspPort: z.number().int().positive().default(554),
   rtspPath: z.string().min(1),
   username: z.string().optional(),
@@ -18,6 +35,42 @@ export const cameraSchema = z.object({
   record: z.boolean().default(true),
 });
 export type Camera = z.infer<typeof cameraSchema>;
+
+/**
+ * A camera the hub found on its LAN. Seeing a camera does not register it —
+ * that takes a claim in the app, which is what puts it in `cameras` above.
+ */
+export const discoveredCameraSchema = z.object({
+  hardwareId: macHardwareIdSchema,
+  /** Display form, e.g. `F0:00:06:21:CD:6E`. */
+  mac: z.string(),
+  /** Current address. Diagnostics only — never fed back into config. */
+  host: z.string(),
+  manufacturer: z.string().optional(),
+  model: z.string().optional(),
+  firmwareVersion: z.string().optional(),
+  lastSeenAt: z.string(),
+  /**
+   * Stream profiles, when the camera lists them without credentials. Paths
+   * only: some cameras put the password in the stream URI's query string, and
+   * the hub must strip it before anything leaves the LAN.
+   *
+   * No codec, on purpose. ONVIF encoder config has been seen to report H264
+   * for an HEVC stream; the heartbeat carries the codec MediaMTX actually got.
+   */
+  profiles: z
+    .array(
+      z.object({
+        name: z.string(),
+        rtspPort: z.number().int().positive().optional(),
+        rtspPath: z.string(),
+        width: z.number().int().positive().optional(),
+        height: z.number().int().positive().optional(),
+      }),
+    )
+    .optional(),
+});
+export type DiscoveredCamera = z.infer<typeof discoveredCameraSchema>;
 
 /** Everything the API tells the hub about how to behave. Sent whole, never patched. */
 export const hubConfigSchema = z.object({
@@ -72,10 +125,25 @@ export const apiLinkMessages = {
           hardwareId: z.string(),
           streaming: z.boolean(),
           recording: z.boolean(),
+          /** The address the hub resolved. Diagnostics only. */
+          host: z.string().optional(),
+          /** Claimed, but not found on the LAN. */
+          unresolved: z.boolean().optional(),
+          /** From the tracks MediaMTX received, e.g. `H264`. */
+          codec: z.string().optional(),
         }),
       ),
     }),
     z.object({ serverTime: z.string() }),
+  ),
+
+  /**
+   * Every camera on the LAN, claimed or not. Full replacement, sent on connect
+   * and whenever the set or an address changes.
+   */
+  'hub.cameras.discovered': define(
+    z.object({ cameras: z.array(discoveredCameraSchema) }),
+    z.object({}),
   ),
 
   /** Full replacement of what is currently attached. Sent on change, not on a timer. */
@@ -147,6 +215,15 @@ export const apiLinkMessages = {
       args: dataSchema.optional(),
     }),
     z.object({ result: z.unknown() }),
+  ),
+
+  /**
+   * Search the LAN now instead of waiting for the next scan — the app's
+   * "search for cameras" button. The reply is the fresh list.
+   */
+  'api.cameras.discover': define(
+    z.object({}),
+    z.object({ cameras: z.array(discoveredCameraSchema) }),
   ),
 
   /** Turn recording on or off for one camera, without changing its config. */

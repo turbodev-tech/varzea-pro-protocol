@@ -4,10 +4,22 @@ import { type PayloadOf, type ReplyOf } from './envelope';
  * The hub's link to the API. The hub is the WebSocket client; the API is the
  * server. `hub.*` is sent by the hub, `api.*` by the API.
  */
-/** One camera the hub should pull and record. `hardwareId` is the MediaMTX path name. */
+/**
+ * One camera the hub should pull and record. `hardwareId` is the MediaMTX path
+ * name.
+ *
+ * There is deliberately no address. Fields are wired and addressed by the
+ * arena router's DHCP, so an IP is something only the hub can know: it finds
+ * cameras by ONVIF discovery and resolves `hardwareId` (the MAC) to an address
+ * itself. Identity lives in the API; address lives in the hub.
+ *
+ * `hardwareId` is not validated as a MAC here, on purpose. This schema sits
+ * inside `api.config`, and one bad camera row would then reject the whole
+ * config — including the placar list scoring depends on. A camera the hub
+ * cannot match to a discovered MAC is reported as unresolved instead.
+ */
 export declare const cameraSchema: z.ZodObject<{
     hardwareId: z.ZodString;
-    host: z.ZodString;
     rtspPort: z.ZodDefault<z.ZodNumber>;
     rtspPath: z.ZodString;
     username: z.ZodOptional<z.ZodString>;
@@ -15,6 +27,27 @@ export declare const cameraSchema: z.ZodObject<{
     record: z.ZodDefault<z.ZodBoolean>;
 }, z.core.$strip>;
 export type Camera = z.infer<typeof cameraSchema>;
+/**
+ * A camera the hub found on its LAN. Seeing a camera does not register it —
+ * that takes a claim in the app, which is what puts it in `cameras` above.
+ */
+export declare const discoveredCameraSchema: z.ZodObject<{
+    hardwareId: z.ZodString;
+    mac: z.ZodString;
+    host: z.ZodString;
+    manufacturer: z.ZodOptional<z.ZodString>;
+    model: z.ZodOptional<z.ZodString>;
+    firmwareVersion: z.ZodOptional<z.ZodString>;
+    lastSeenAt: z.ZodString;
+    profiles: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        rtspPort: z.ZodOptional<z.ZodNumber>;
+        rtspPath: z.ZodString;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>>;
+}, z.core.$strip>;
+export type DiscoveredCamera = z.infer<typeof discoveredCameraSchema>;
 /** Everything the API tells the hub about how to behave. Sent whole, never patched. */
 export declare const hubConfigSchema: z.ZodObject<{
     playingAreaId: z.ZodNullable<z.ZodString>;
@@ -30,7 +63,6 @@ export declare const hubConfigSchema: z.ZodObject<{
     }, z.core.$strip>>;
     cameras: z.ZodArray<z.ZodObject<{
         hardwareId: z.ZodString;
-        host: z.ZodString;
         rtspPort: z.ZodDefault<z.ZodNumber>;
         rtspPath: z.ZodString;
         username: z.ZodOptional<z.ZodString>;
@@ -69,7 +101,6 @@ export declare const apiLinkMessages: {
             }, z.core.$strip>>;
             cameras: z.ZodArray<z.ZodObject<{
                 hardwareId: z.ZodString;
-                host: z.ZodString;
                 rtspPort: z.ZodDefault<z.ZodNumber>;
                 rtspPath: z.ZodString;
                 username: z.ZodOptional<z.ZodString>;
@@ -97,10 +128,35 @@ export declare const apiLinkMessages: {
             hardwareId: z.ZodString;
             streaming: z.ZodBoolean;
             recording: z.ZodBoolean;
+            host: z.ZodOptional<z.ZodString>;
+            unresolved: z.ZodOptional<z.ZodBoolean>;
+            codec: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>;
     }, z.core.$strip>, z.ZodObject<{
         serverTime: z.ZodString;
     }, z.core.$strip>>;
+    /**
+     * Every camera on the LAN, claimed or not. Full replacement, sent on connect
+     * and whenever the set or an address changes.
+     */
+    readonly 'hub.cameras.discovered': import("./envelope").MessageSpec<z.ZodObject<{
+        cameras: z.ZodArray<z.ZodObject<{
+            hardwareId: z.ZodString;
+            mac: z.ZodString;
+            host: z.ZodString;
+            manufacturer: z.ZodOptional<z.ZodString>;
+            model: z.ZodOptional<z.ZodString>;
+            firmwareVersion: z.ZodOptional<z.ZodString>;
+            lastSeenAt: z.ZodString;
+            profiles: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                name: z.ZodString;
+                rtspPort: z.ZodOptional<z.ZodNumber>;
+                rtspPath: z.ZodString;
+                width: z.ZodOptional<z.ZodNumber>;
+                height: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>, z.ZodObject<{}, z.core.$strip>>;
     /** Full replacement of what is currently attached. Sent on change, not on a timer. */
     readonly 'hub.peripherals': import("./envelope").MessageSpec<z.ZodObject<{
         peripherals: z.ZodArray<z.ZodObject<{
@@ -171,7 +227,6 @@ export declare const apiLinkMessages: {
         }, z.core.$strip>>;
         cameras: z.ZodArray<z.ZodObject<{
             hardwareId: z.ZodString;
-            host: z.ZodString;
             rtspPort: z.ZodDefault<z.ZodNumber>;
             rtspPath: z.ZodString;
             username: z.ZodOptional<z.ZodString>;
@@ -188,6 +243,28 @@ export declare const apiLinkMessages: {
         args: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         result: z.ZodUnknown;
+    }, z.core.$strip>>;
+    /**
+     * Search the LAN now instead of waiting for the next scan — the app's
+     * "search for cameras" button. The reply is the fresh list.
+     */
+    readonly 'api.cameras.discover': import("./envelope").MessageSpec<z.ZodObject<{}, z.core.$strip>, z.ZodObject<{
+        cameras: z.ZodArray<z.ZodObject<{
+            hardwareId: z.ZodString;
+            mac: z.ZodString;
+            host: z.ZodString;
+            manufacturer: z.ZodOptional<z.ZodString>;
+            model: z.ZodOptional<z.ZodString>;
+            firmwareVersion: z.ZodOptional<z.ZodString>;
+            lastSeenAt: z.ZodString;
+            profiles: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                name: z.ZodString;
+                rtspPort: z.ZodOptional<z.ZodNumber>;
+                rtspPath: z.ZodString;
+                width: z.ZodOptional<z.ZodNumber>;
+                height: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>>;
+        }, z.core.$strip>>;
     }, z.core.$strip>>;
     /** Turn recording on or off for one camera, without changing its config. */
     readonly 'api.recording.set': import("./envelope").MessageSpec<z.ZodObject<{
