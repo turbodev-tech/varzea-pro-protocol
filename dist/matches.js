@@ -10,7 +10,16 @@ const zod_1 = require("zod");
  * (`startedAt`) ends the warmup early when someone presses start, and the
  * phases after it are measured from kickoff.
  */
-/** One side, as the placar draws it. */
+/**
+ * One side, as the placar draws it.
+ *
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send a palette `color` (`#rrggbb`) and a non-empty
+ * `shortName` of at most 10 characters, upper-cased before it is cut to that
+ * length.
+ */
 exports.matchSideSchema = zod_1.z.object({
     name: zod_1.z.string().min(1),
     /** What fits the LED panel: at most 10 characters. */
@@ -21,6 +30,13 @@ exports.matchSideSchema = zod_1.z.object({
 /** Cancelled matches are never sent; a match that disappears was cancelled. */
 exports.matchStatusSchema = zod_1.z.enum(['SCHEDULED', 'LIVE', 'FINISHED']);
 const seconds = zod_1.z.number().int().nonnegative();
+/**
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send `durationSeconds >= 1`, alongside a valid `home` and
+ * `away` (see `matchSideSchema`).
+ */
 exports.scheduledMatchSchema = zod_1.z.object({
     id: zod_1.z.string().min(1),
     status: exports.matchStatusSchema,
@@ -50,6 +66,11 @@ exports.displayModeSchema = zod_1.z.enum(['IDLE', 'WARMUP', 'LIVE', 'OVERTIME', 
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ *
+ * Every absolute time here is on the hub's corrected clock — the offset the
+ * placar learns from `hubTime` in the `peripheral.connected` and
+ * `peripheral.heartbeat` replies, not the placar's own clock. The placar
+ * renders arena time as UTC−3, fixed.
  */
 exports.displayStateSchema = zod_1.z.object({
     mode: exports.displayModeSchema,

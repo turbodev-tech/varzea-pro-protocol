@@ -58,15 +58,26 @@ only while one is active, and reports what happened on the field:
 | Message | Meaning |
 |---|---|
 | `hub.match.started` | Kickoff, from a placar hold (`PLACAR`) or warmup running out (`TIMER`). |
-| `hub.match.ended` | Time ran out. An end pressed in an app arrives through `api.matches`. |
-| `hub.display` | Hub → placar: what to draw. |
-| `peripheral.match.start` | Placar → hub: Highlight held for 3 seconds. |
+| `hub.match.ended` | Time ran out. An end pressed in an app arrives through `api.matches`. The reply carries no end time — that end reaches the hub via `api.matches`. |
+| `hub.display` | Hub → placar: what to draw. Every absolute time is on the hub's corrected clock, which the placar learns from `hubTime` in the connect/heartbeat replies; the placar renders arena time as UTC−3, fixed. |
+| `peripheral.match.start` | Placar → hub: Highlight held for 3 seconds. `started: true` means a hold fell inside a match's warmup and that match's kickoff is now at or before the hold time (`matchId` names it) — a late-delivered hold can move an earlier timer kickoff back, since the earliest kickoff wins. `started: false` only when no match was in warmup at that moment. |
+
+The hub validates `api.matches` and the `hub.connected` reply as a whole: one
+invalid match rejects the entire message — for `hub.connected` that means no
+config at all, and the hub loops reconnecting. The API must therefore always
+send a palette colour (`#rrggbb`), a non-empty short name of at most 10
+characters (upper-cased before being cut to that length), and
+`durationSeconds >= 1`.
 
 Every `hub.upload.request` names its match and when the segment began, and its
 path is `{camera}/{file}`. There is no per-camera recording switch any more.
 
 The placar reports an undone goal as a `peripheral.event` with `eventType`
-`GOL_TIME_1_REVERT` or `GOL_TIME_2_REVERT`, forwarded as a `hub.event`.
+`GOL_TIME_1_REVERT` or `GOL_TIME_2_REVERT`, forwarded as a `hub.event`. Its
+`data` should carry `{ revertsClientEventId: "<clientEventId of the goal it
+undoes>" }`. Receivers cancel that goal when `revertsClientEventId` is
+present — the revert may arrive before its goal, which is then recorded as
+cancelled — otherwise they cancel the latest live goal of that side.
 
 ## Consuming
 

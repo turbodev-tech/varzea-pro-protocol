@@ -52,9 +52,13 @@ export declare const peripheralLinkMessages: {
     /**
      * Highlight held for 3 seconds: kick off the match in warmup.
      *
-     * Queued like a goal, with `ageMs` for the same reason. The hub starts the
-     * match that was in warmup at `now − ageMs`. `started: false` means there
-     * was none, or it had already kicked off, and the placar shows SEM PARTIDA.
+     * Queued like a goal, with `ageMs` for the same reason. `started: true`
+     * means a hold at `now − ageMs` fell inside a match's warmup, and that
+     * match's kickoff is now at or before the hold time — `matchId` names that
+     * match. A late-delivered hold can move an earlier timer kickoff back,
+     * because the earliest kickoff always wins (see `hub.match.started`).
+     * `started: false` only when no match was in warmup at that moment, and
+     * the placar shows SEM PARTIDA.
      */
     readonly 'peripheral.match.start': import("./envelope").MessageSpec<z.ZodObject<{
         clientEventId: z.ZodString;

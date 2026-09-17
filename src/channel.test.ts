@@ -113,7 +113,7 @@ describe('Channel', () => {
 
     await assert.rejects(
       hub.ask('hub.upload.request', {
-        path: 'cam1/2026-07-27/21-14-03.ts',
+        path: 'CMRA1/2026-01-01_10-00-00.mp4',
         contentType: 'video/mp2t',
         bytes: 1024,
         matchId: '6f1d7c1e-3f0a-4a51-9c55-0d5b1b1a2f10',

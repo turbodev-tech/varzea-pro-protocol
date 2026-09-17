@@ -169,6 +169,8 @@ exports.apiLinkMessages = {
     /**
      * The match ran out of time. An end pressed in an app travels the other
      * way, inside `api.matches`. Durable and idempotent on `clientEventId`.
+     * The reply carries no end time: an end from an app arrives via
+     * `api.matches`, not through this reply.
      */
     'hub.match.ended': (0, envelope_1.define)(zod_1.z.object({
         matchId: zod_1.z.string().min(1),

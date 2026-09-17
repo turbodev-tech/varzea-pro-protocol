@@ -248,6 +248,8 @@ export declare const apiLinkMessages: {
     /**
      * The match ran out of time. An end pressed in an app travels the other
      * way, inside `api.matches`. Durable and idempotent on `clientEventId`.
+     * The reply carries no end time: an end from an app arrives via
+     * `api.matches`, not through this reply.
      */
     readonly 'hub.match.ended': import("./envelope").MessageSpec<z.ZodObject<{
         matchId: z.ZodString;

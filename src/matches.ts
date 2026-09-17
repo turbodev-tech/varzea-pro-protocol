@@ -9,7 +9,16 @@ import { z } from 'zod';
  * phases after it are measured from kickoff.
  */
 
-/** One side, as the placar draws it. */
+/**
+ * One side, as the placar draws it.
+ *
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send a palette `color` (`#rrggbb`) and a non-empty
+ * `shortName` of at most 10 characters, upper-cased before it is cut to that
+ * length.
+ */
 export const matchSideSchema = z.object({
   name: z.string().min(1),
   /** What fits the LED panel: at most 10 characters. */
@@ -25,6 +34,13 @@ export type MatchStatus = z.infer<typeof matchStatusSchema>;
 
 const seconds = z.number().int().nonnegative();
 
+/**
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send `durationSeconds >= 1`, alongside a valid `home` and
+ * `away` (see `matchSideSchema`).
+ */
 export const scheduledMatchSchema = z.object({
   id: z.string().min(1),
   status: matchStatusSchema,
@@ -60,6 +76,11 @@ export type DisplayMode = z.infer<typeof displayModeSchema>;
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ *
+ * Every absolute time here is on the hub's corrected clock — the offset the
+ * placar learns from `hubTime` in the `peripheral.connected` and
+ * `peripheral.heartbeat` replies, not the placar's own clock. The placar
+ * renders arena time as UTC−3, fixed.
  */
 export const displayStateSchema = z.object({
   mode: displayModeSchema,

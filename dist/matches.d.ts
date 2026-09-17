@@ -7,7 +7,16 @@ import { z } from 'zod';
  * (`startedAt`) ends the warmup early when someone presses start, and the
  * phases after it are measured from kickoff.
  */
-/** One side, as the placar draws it. */
+/**
+ * One side, as the placar draws it.
+ *
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send a palette `color` (`#rrggbb`) and a non-empty
+ * `shortName` of at most 10 characters, upper-cased before it is cut to that
+ * length.
+ */
 export declare const matchSideSchema: z.ZodObject<{
     name: z.ZodString;
     shortName: z.ZodString;
@@ -21,6 +30,13 @@ export declare const matchStatusSchema: z.ZodEnum<{
     FINISHED: "FINISHED";
 }>;
 export type MatchStatus = z.infer<typeof matchStatusSchema>;
+/**
+ * The hub validates `api.matches` and the `hub.connected` reply as a whole:
+ * one invalid match rejects the entire message (for `hub.connected`, that
+ * means no config at all, and the hub loops reconnecting). The API must
+ * therefore always send `durationSeconds >= 1`, alongside a valid `home` and
+ * `away` (see `matchSideSchema`).
+ */
 export declare const scheduledMatchSchema: z.ZodObject<{
     id: z.ZodString;
     status: z.ZodEnum<{
@@ -92,6 +108,11 @@ export type DisplayMode = z.infer<typeof displayModeSchema>;
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ *
+ * Every absolute time here is on the hub's corrected clock — the offset the
+ * placar learns from `hubTime` in the `peripheral.connected` and
+ * `peripheral.heartbeat` replies, not the placar's own clock. The placar
+ * renders arena time as UTC−3, fixed.
  */
 export declare const displayStateSchema: z.ZodObject<{
     mode: z.ZodEnum<{
