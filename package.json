@@ -1,6 +1,6 @@
 {
   "name": "@varzea/hub-protocol",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Wire protocol shared by the VarzeaPro API, hub and peripherals.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

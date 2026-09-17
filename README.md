@@ -48,6 +48,26 @@ One line in `api-link.ts` or `peripheral-link.ts`:
 Both ends pick up the types and the runtime validation automatically. A message
 that is not in the table cannot be sent.
 
+## Matches
+
+Only the platform creates matches. The API sends the hub its pitch's schedule
+(`api.matches`, also in the `hub.connected` reply) whenever anything changes.
+The hub runs each match through warmup → live → overtime → ended, records
+only while one is active, and reports what happened on the field:
+
+| Message | Meaning |
+|---|---|
+| `hub.match.started` | Kickoff, from a placar hold (`PLACAR`) or warmup running out (`TIMER`). |
+| `hub.match.ended` | Time ran out. An end pressed in an app arrives through `api.matches`. |
+| `hub.display` | Hub → placar: what to draw. |
+| `peripheral.match.start` | Placar → hub: Highlight held for 3 seconds. |
+
+Every `hub.upload.request` names its match and when the segment began, and its
+path is `{camera}/{file}`. There is no per-camera recording switch any more.
+
+The placar reports an undone goal as a `peripheral.event` with `eventType`
+`GOL_TIME_1_REVERT` or `GOL_TIME_2_REVERT`, forwarded as a `hub.event`.
+
 ## Consuming
 
 CommonJS output, so it imports cleanly from the API (CJS) and the hub (ESM).
