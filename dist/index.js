@@ -16,6 +16,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./envelope"), exports);
 __exportStar(require("./shared"), exports);
+__exportStar(require("./matches"), exports);
 __exportStar(require("./channel"), exports);
 __exportStar(require("./api-link"), exports);
 __exportStar(require("./peripheral-link"), exports);

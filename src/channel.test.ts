@@ -43,8 +43,9 @@ const config: HubConfig = {
   peripherals: [{ hardwareId: "placar-01", type: "PLACAR" }],
   playingAreaId: null,
   heartbeatSeconds: 30,
+  arenaName: 'Arena',
   cameras: [
-    { hardwareId: 'f0000621cd6e', rtspPort: 554, rtspPath: '/stream0', record: true },
+    { hardwareId: 'f0000621cd6e', rtspPort: 554, rtspPath: '/stream0' },
   ],
 };
 
@@ -115,6 +116,8 @@ describe('Channel', () => {
         path: 'cam1/2026-07-27/21-14-03.ts',
         contentType: 'video/mp2t',
         bytes: 1024,
+        matchId: '6f1d7c1e-3f0a-4a51-9c55-0d5b1b1a2f10',
+        segmentStartedAt: '2026-09-20T22:00:00.000Z',
       }),
       (error: ProtocolError) => {
         assert.equal(error.code, 'r2_unavailable');
@@ -220,7 +223,7 @@ describe('Channel', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     assert.equal(received?.cameras[0]?.rtspPort, 554);
-    assert.equal(received?.cameras[0]?.record, true);
+    assert.equal('record' in (received?.cameras[0] ?? {}), false);
   });
 
   it('ignores frames that are not valid envelopes', () => {

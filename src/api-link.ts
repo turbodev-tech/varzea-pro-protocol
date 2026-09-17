@@ -6,6 +6,7 @@ import {
   macHardwareIdSchema,
   peripheralSchema,
 } from './shared';
+import { matchScheduleSchema, scheduledMatchSchema } from './matches';
 
 /**
  * The hub's link to the API. The hub is the WebSocket client; the API is the
@@ -13,8 +14,8 @@ import {
  */
 
 /**
- * One camera the hub should pull and record. `hardwareId` is the MediaMTX path
- * name.
+ * One camera the hub should pull. It records only while a match on the pitch is active.
+ * `hardwareId` is the MediaMTX path name.
  *
  * There is deliberately no address. Fields are wired and addressed by the
  * arena router's DHCP, so an IP is something only the hub can know: it finds
@@ -32,7 +33,6 @@ export const cameraSchema = z.object({
   rtspPath: z.string().min(1),
   username: z.string().optional(),
   password: z.string().optional(),
-  record: z.boolean().default(true),
 });
 export type Camera = z.infer<typeof cameraSchema>;
 
@@ -86,6 +86,8 @@ export const hubConfigSchema = z.object({
    */
   peripherals: z.array(peripheralSchema),
   cameras: z.array(cameraSchema),
+  /** Shown by the placar between matches. */
+  arenaName: z.string().default(''),
 });
 export type HubConfig = z.infer<typeof hubConfigSchema>;
 
@@ -102,6 +104,8 @@ export const apiLinkMessages = {
     z.object({
       serverTime: z.string(),
       config: hubConfigSchema,
+      /** The pitch's schedule, so a reconnecting hub never waits for a push. */
+      matches: z.array(scheduledMatchSchema),
     }),
   ),
 
@@ -166,23 +170,60 @@ export const apiLinkMessages = {
       eventType: z.string().min(1),
       occurredAt: z.string(),
       clientEventId: z.string().min(1),
+      /** The match active on the pitch when it happened, if any. */
+      matchId: z.string().min(1).optional(),
       data: dataSchema.optional(),
     }),
     z.object({ eventId: z.string() }),
   ),
 
-  /** A finished recording segment needs somewhere to go. */
+  /**
+   * A finished recording segment needs somewhere to go. Cameras only record
+   * during a match, so every segment belongs to one. `path` is
+   * `{camera hardwareId}/{file}`; `segmentStartedAt` is when the segment began,
+   * clock-corrected, which is how the worker cuts a match window.
+   */
   'hub.upload.request': define(
     z.object({
       path: z.string().min(1),
       contentType: z.string().min(1),
       bytes: z.number().int().positive(),
+      matchId: z.string().min(1),
+      segmentStartedAt: z.string(),
     }),
     z.object({
       uploadUrl: z.string(),
       key: z.string(),
       expiresInSeconds: z.number().int().positive(),
     }),
+  ),
+
+  /**
+   * Kickoff happened on the field: a placar hold during warmup, or warmup ran
+   * out. Durable and idempotent on `clientEventId`. The reply carries the
+   * kickoff time that won, which is the earliest one reported.
+   */
+  'hub.match.started': define(
+    z.object({
+      matchId: z.string().min(1),
+      clientEventId: z.string().min(1),
+      startedAt: z.string(),
+      source: z.enum(['PLACAR', 'TIMER']),
+    }),
+    z.object({ matchId: z.string(), startedAt: z.string() }),
+  ),
+
+  /**
+   * The match ran out of time. An end pressed in an app travels the other
+   * way, inside `api.matches`. Durable and idempotent on `clientEventId`.
+   */
+  'hub.match.ended': define(
+    z.object({
+      matchId: z.string().min(1),
+      clientEventId: z.string().min(1),
+      endedAt: z.string(),
+    }),
+    z.object({ matchId: z.string() }),
   ),
 
   /** Diagnostics. Fire-and-forget: a log must never block or fail a real operation. */
@@ -204,6 +245,12 @@ export const apiLinkMessages = {
    */
   'api.config': define(hubConfigSchema, null),
 
+  /**
+   * The pitch's match schedule, sent whole whenever any match on it changes
+   * and every 15 minutes. No ack, for the same reason as `api.config`.
+   */
+  'api.matches': define(matchScheduleSchema, null),
+
   /** Asks the hub to re-send `hub.peripherals`. */
   'api.peripherals.refresh': define(z.object({}), null),
 
@@ -224,12 +271,6 @@ export const apiLinkMessages = {
   'api.cameras.discover': define(
     z.object({}),
     z.object({ cameras: z.array(discoveredCameraSchema) }),
-  ),
-
-  /** Turn recording on or off for one camera, without changing its config. */
-  'api.recording.set': define(
-    z.object({ cameraHardwareId: z.string().min(1), record: z.boolean() }),
-    z.object({ recording: z.boolean() }),
   ),
 
   /** Liveness probe from an operator. */

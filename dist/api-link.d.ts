@@ -5,8 +5,8 @@ import { type PayloadOf, type ReplyOf } from './envelope';
  * server. `hub.*` is sent by the hub, `api.*` by the API.
  */
 /**
- * One camera the hub should pull and record. `hardwareId` is the MediaMTX path
- * name.
+ * One camera the hub should pull. It records only while a match on the pitch is active.
+ * `hardwareId` is the MediaMTX path name.
  *
  * There is deliberately no address. Fields are wired and addressed by the
  * arena router's DHCP, so an IP is something only the hub can know: it finds
@@ -24,7 +24,6 @@ export declare const cameraSchema: z.ZodObject<{
     rtspPath: z.ZodString;
     username: z.ZodOptional<z.ZodString>;
     password: z.ZodOptional<z.ZodString>;
-    record: z.ZodDefault<z.ZodBoolean>;
 }, z.core.$strip>;
 export type Camera = z.infer<typeof cameraSchema>;
 /**
@@ -67,8 +66,8 @@ export declare const hubConfigSchema: z.ZodObject<{
         rtspPath: z.ZodString;
         username: z.ZodOptional<z.ZodString>;
         password: z.ZodOptional<z.ZodString>;
-        record: z.ZodDefault<z.ZodBoolean>;
     }, z.core.$strip>>;
+    arenaName: z.ZodDefault<z.ZodString>;
 }, z.core.$strip>;
 export type HubConfig = z.infer<typeof hubConfigSchema>;
 export declare const apiLinkMessages: {
@@ -105,9 +104,33 @@ export declare const apiLinkMessages: {
                 rtspPath: z.ZodString;
                 username: z.ZodOptional<z.ZodString>;
                 password: z.ZodOptional<z.ZodString>;
-                record: z.ZodDefault<z.ZodBoolean>;
             }, z.core.$strip>>;
+            arenaName: z.ZodDefault<z.ZodString>;
         }, z.core.$strip>;
+        matches: z.ZodArray<z.ZodObject<{
+            id: z.ZodString;
+            status: z.ZodEnum<{
+                SCHEDULED: "SCHEDULED";
+                LIVE: "LIVE";
+                FINISHED: "FINISHED";
+            }>;
+            startsAt: z.ZodString;
+            warmupSeconds: z.ZodNumber;
+            durationSeconds: z.ZodNumber;
+            overtimeSeconds: z.ZodNumber;
+            startedAt: z.ZodOptional<z.ZodString>;
+            endedAt: z.ZodOptional<z.ZodString>;
+            home: z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>;
+            away: z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>;
+        }, z.core.$strip>>;
     }, z.core.$strip>>;
     /**
      * Periodic liveness + status. `serverTime` in the reply is how the hub keeps
@@ -183,19 +206,55 @@ export declare const apiLinkMessages: {
         eventType: z.ZodString;
         occurredAt: z.ZodString;
         clientEventId: z.ZodString;
+        matchId: z.ZodOptional<z.ZodString>;
         data: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, z.core.$strip>, z.ZodObject<{
         eventId: z.ZodString;
     }, z.core.$strip>>;
-    /** A finished recording segment needs somewhere to go. */
+    /**
+     * A finished recording segment needs somewhere to go. Cameras only record
+     * during a match, so every segment belongs to one. `path` is
+     * `{camera hardwareId}/{file}`; `segmentStartedAt` is when the segment began,
+     * clock-corrected, which is how the worker cuts a match window.
+     */
     readonly 'hub.upload.request': import("./envelope").MessageSpec<z.ZodObject<{
         path: z.ZodString;
         contentType: z.ZodString;
         bytes: z.ZodNumber;
+        matchId: z.ZodString;
+        segmentStartedAt: z.ZodString;
     }, z.core.$strip>, z.ZodObject<{
         uploadUrl: z.ZodString;
         key: z.ZodString;
         expiresInSeconds: z.ZodNumber;
+    }, z.core.$strip>>;
+    /**
+     * Kickoff happened on the field: a placar hold during warmup, or warmup ran
+     * out. Durable and idempotent on `clientEventId`. The reply carries the
+     * kickoff time that won, which is the earliest one reported.
+     */
+    readonly 'hub.match.started': import("./envelope").MessageSpec<z.ZodObject<{
+        matchId: z.ZodString;
+        clientEventId: z.ZodString;
+        startedAt: z.ZodString;
+        source: z.ZodEnum<{
+            PLACAR: "PLACAR";
+            TIMER: "TIMER";
+        }>;
+    }, z.core.$strip>, z.ZodObject<{
+        matchId: z.ZodString;
+        startedAt: z.ZodString;
+    }, z.core.$strip>>;
+    /**
+     * The match ran out of time. An end pressed in an app travels the other
+     * way, inside `api.matches`. Durable and idempotent on `clientEventId`.
+     */
+    readonly 'hub.match.ended': import("./envelope").MessageSpec<z.ZodObject<{
+        matchId: z.ZodString;
+        clientEventId: z.ZodString;
+        endedAt: z.ZodString;
+    }, z.core.$strip>, z.ZodObject<{
+        matchId: z.ZodString;
     }, z.core.$strip>>;
     /** Diagnostics. Fire-and-forget: a log must never block or fail a real operation. */
     readonly 'hub.log': import("./envelope").MessageSpec<z.ZodObject<{
@@ -231,7 +290,37 @@ export declare const apiLinkMessages: {
             rtspPath: z.ZodString;
             username: z.ZodOptional<z.ZodString>;
             password: z.ZodOptional<z.ZodString>;
-            record: z.ZodDefault<z.ZodBoolean>;
+        }, z.core.$strip>>;
+        arenaName: z.ZodDefault<z.ZodString>;
+    }, z.core.$strip>, null>;
+    /**
+     * The pitch's match schedule, sent whole whenever any match on it changes
+     * and every 15 minutes. No ack, for the same reason as `api.config`.
+     */
+    readonly 'api.matches': import("./envelope").MessageSpec<z.ZodObject<{
+        matches: z.ZodArray<z.ZodObject<{
+            id: z.ZodString;
+            status: z.ZodEnum<{
+                SCHEDULED: "SCHEDULED";
+                LIVE: "LIVE";
+                FINISHED: "FINISHED";
+            }>;
+            startsAt: z.ZodString;
+            warmupSeconds: z.ZodNumber;
+            durationSeconds: z.ZodNumber;
+            overtimeSeconds: z.ZodNumber;
+            startedAt: z.ZodOptional<z.ZodString>;
+            endedAt: z.ZodOptional<z.ZodString>;
+            home: z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>;
+            away: z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>;
         }, z.core.$strip>>;
     }, z.core.$strip>, null>;
     /** Asks the hub to re-send `hub.peripherals`. */
@@ -265,13 +354,6 @@ export declare const apiLinkMessages: {
                 height: z.ZodOptional<z.ZodNumber>;
             }, z.core.$strip>>>;
         }, z.core.$strip>>;
-    }, z.core.$strip>>;
-    /** Turn recording on or off for one camera, without changing its config. */
-    readonly 'api.recording.set': import("./envelope").MessageSpec<z.ZodObject<{
-        cameraHardwareId: z.ZodString;
-        record: z.ZodBoolean;
-    }, z.core.$strip>, z.ZodObject<{
-        recording: z.ZodBoolean;
     }, z.core.$strip>>;
     /** Liveness probe from an operator. */
     readonly 'api.ping': import("./envelope").MessageSpec<z.ZodObject<{

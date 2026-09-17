@@ -4,13 +4,14 @@ exports.apiLinkMessages = exports.hubConfigSchema = exports.discoveredCameraSche
 const zod_1 = require("zod");
 const envelope_1 = require("./envelope");
 const shared_1 = require("./shared");
+const matches_1 = require("./matches");
 /**
  * The hub's link to the API. The hub is the WebSocket client; the API is the
  * server. `hub.*` is sent by the hub, `api.*` by the API.
  */
 /**
- * One camera the hub should pull and record. `hardwareId` is the MediaMTX path
- * name.
+ * One camera the hub should pull. It records only while a match on the pitch is active.
+ * `hardwareId` is the MediaMTX path name.
  *
  * There is deliberately no address. Fields are wired and addressed by the
  * arena router's DHCP, so an IP is something only the hub can know: it finds
@@ -28,7 +29,6 @@ exports.cameraSchema = zod_1.z.object({
     rtspPath: zod_1.z.string().min(1),
     username: zod_1.z.string().optional(),
     password: zod_1.z.string().optional(),
-    record: zod_1.z.boolean().default(true),
 });
 /**
  * A camera the hub found on its LAN. Seeing a camera does not register it —
@@ -76,6 +76,8 @@ exports.hubConfigSchema = zod_1.z.object({
      */
     peripherals: zod_1.z.array(shared_1.peripheralSchema),
     cameras: zod_1.z.array(exports.cameraSchema),
+    /** Shown by the placar between matches. */
+    arenaName: zod_1.z.string().default(''),
 });
 exports.apiLinkMessages = {
     // ── hub → API ──────────────────────────────────────────────────────────────
@@ -87,6 +89,8 @@ exports.apiLinkMessages = {
     }), zod_1.z.object({
         serverTime: zod_1.z.string(),
         config: exports.hubConfigSchema,
+        /** The pitch's schedule, so a reconnecting hub never waits for a push. */
+        matches: zod_1.z.array(matches_1.scheduledMatchSchema),
     })),
     /**
      * Periodic liveness + status. `serverTime` in the reply is how the hub keeps
@@ -130,18 +134,47 @@ exports.apiLinkMessages = {
         eventType: zod_1.z.string().min(1),
         occurredAt: zod_1.z.string(),
         clientEventId: zod_1.z.string().min(1),
+        /** The match active on the pitch when it happened, if any. */
+        matchId: zod_1.z.string().min(1).optional(),
         data: shared_1.dataSchema.optional(),
     }), zod_1.z.object({ eventId: zod_1.z.string() })),
-    /** A finished recording segment needs somewhere to go. */
+    /**
+     * A finished recording segment needs somewhere to go. Cameras only record
+     * during a match, so every segment belongs to one. `path` is
+     * `{camera hardwareId}/{file}`; `segmentStartedAt` is when the segment began,
+     * clock-corrected, which is how the worker cuts a match window.
+     */
     'hub.upload.request': (0, envelope_1.define)(zod_1.z.object({
         path: zod_1.z.string().min(1),
         contentType: zod_1.z.string().min(1),
         bytes: zod_1.z.number().int().positive(),
+        matchId: zod_1.z.string().min(1),
+        segmentStartedAt: zod_1.z.string(),
     }), zod_1.z.object({
         uploadUrl: zod_1.z.string(),
         key: zod_1.z.string(),
         expiresInSeconds: zod_1.z.number().int().positive(),
     })),
+    /**
+     * Kickoff happened on the field: a placar hold during warmup, or warmup ran
+     * out. Durable and idempotent on `clientEventId`. The reply carries the
+     * kickoff time that won, which is the earliest one reported.
+     */
+    'hub.match.started': (0, envelope_1.define)(zod_1.z.object({
+        matchId: zod_1.z.string().min(1),
+        clientEventId: zod_1.z.string().min(1),
+        startedAt: zod_1.z.string(),
+        source: zod_1.z.enum(['PLACAR', 'TIMER']),
+    }), zod_1.z.object({ matchId: zod_1.z.string(), startedAt: zod_1.z.string() })),
+    /**
+     * The match ran out of time. An end pressed in an app travels the other
+     * way, inside `api.matches`. Durable and idempotent on `clientEventId`.
+     */
+    'hub.match.ended': (0, envelope_1.define)(zod_1.z.object({
+        matchId: zod_1.z.string().min(1),
+        clientEventId: zod_1.z.string().min(1),
+        endedAt: zod_1.z.string(),
+    }), zod_1.z.object({ matchId: zod_1.z.string() })),
     /** Diagnostics. Fire-and-forget: a log must never block or fail a real operation. */
     'hub.log': (0, envelope_1.define)(zod_1.z.object({
         level: shared_1.logLevelSchema,
@@ -155,6 +188,11 @@ exports.apiLinkMessages = {
      * a "received" acknowledgement.
      */
     'api.config': (0, envelope_1.define)(exports.hubConfigSchema, null),
+    /**
+     * The pitch's match schedule, sent whole whenever any match on it changes
+     * and every 15 minutes. No ack, for the same reason as `api.config`.
+     */
+    'api.matches': (0, envelope_1.define)(matches_1.matchScheduleSchema, null),
     /** Asks the hub to re-send `hub.peripherals`. */
     'api.peripherals.refresh': (0, envelope_1.define)(zod_1.z.object({}), null),
     /** Relayed down to a peripheral; the reply is that peripheral's answer. */
@@ -168,8 +206,6 @@ exports.apiLinkMessages = {
      * "search for cameras" button. The reply is the fresh list.
      */
     'api.cameras.discover': (0, envelope_1.define)(zod_1.z.object({}), zod_1.z.object({ cameras: zod_1.z.array(exports.discoveredCameraSchema) })),
-    /** Turn recording on or off for one camera, without changing its config. */
-    'api.recording.set': (0, envelope_1.define)(zod_1.z.object({ cameraHardwareId: zod_1.z.string().min(1), record: zod_1.z.boolean() }), zod_1.z.object({ recording: zod_1.z.boolean() })),
     /** Liveness probe from an operator. */
     'api.ping': (0, envelope_1.define)(zod_1.z.object({ nonce: zod_1.z.string() }), zod_1.z.object({ nonce: zod_1.z.string(), hubTime: zod_1.z.string() })),
 };
