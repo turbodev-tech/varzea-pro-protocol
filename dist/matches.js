@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.matchScheduleSchema = exports.scheduledMatchSchema = exports.matchStatusSchema = exports.matchSideSchema = void 0;
+exports.displayStateSchema = exports.displayModeSchema = exports.matchScheduleSchema = exports.scheduledMatchSchema = exports.matchStatusSchema = exports.matchSideSchema = void 0;
 const zod_1 = require("zod");
 /**
  * Matches, as the field sees them. Only the platform creates a match; the hub
@@ -41,4 +41,26 @@ exports.scheduledMatchSchema = zod_1.z.object({
  */
 exports.matchScheduleSchema = zod_1.z.object({
     matches: zod_1.z.array(exports.scheduledMatchSchema),
+});
+/** What the placar is showing. */
+exports.displayModeSchema = zod_1.z.enum(['IDLE', 'WARMUP', 'LIVE', 'OVERTIME', 'ENDED']);
+/**
+ * Everything the placar needs to draw, sent whole on every change.
+ *
+ * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
+ * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
+ * IDLE shows `arenaName` and the time of day.
+ */
+exports.displayStateSchema = zod_1.z.object({
+    mode: exports.displayModeSchema,
+    arenaName: zod_1.z.string(),
+    home: exports.matchSideSchema.optional(),
+    away: exports.matchSideSchema.optional(),
+    score: zod_1.z
+        .object({ home: zod_1.z.number().int().nonnegative(), away: zod_1.z.number().int().nonnegative() })
+        .optional(),
+    phaseEndsAt: zod_1.z.string().optional(),
+    startedAt: zod_1.z.string().optional(),
+    durationSeconds: zod_1.z.number().int().positive().optional(),
+    overtimeSeconds: zod_1.z.number().int().nonnegative().optional(),
 });

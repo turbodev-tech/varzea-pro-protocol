@@ -77,3 +77,48 @@ export declare const matchScheduleSchema: z.ZodObject<{
     }, z.core.$strip>>;
 }, z.core.$strip>;
 export type MatchSchedule = z.infer<typeof matchScheduleSchema>;
+/** What the placar is showing. */
+export declare const displayModeSchema: z.ZodEnum<{
+    LIVE: "LIVE";
+    IDLE: "IDLE";
+    WARMUP: "WARMUP";
+    OVERTIME: "OVERTIME";
+    ENDED: "ENDED";
+}>;
+export type DisplayMode = z.infer<typeof displayModeSchema>;
+/**
+ * Everything the placar needs to draw, sent whole on every change.
+ *
+ * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
+ * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
+ * IDLE shows `arenaName` and the time of day.
+ */
+export declare const displayStateSchema: z.ZodObject<{
+    mode: z.ZodEnum<{
+        LIVE: "LIVE";
+        IDLE: "IDLE";
+        WARMUP: "WARMUP";
+        OVERTIME: "OVERTIME";
+        ENDED: "ENDED";
+    }>;
+    arenaName: z.ZodString;
+    home: z.ZodOptional<z.ZodObject<{
+        name: z.ZodString;
+        shortName: z.ZodString;
+        color: z.ZodString;
+    }, z.core.$strip>>;
+    away: z.ZodOptional<z.ZodObject<{
+        name: z.ZodString;
+        shortName: z.ZodString;
+        color: z.ZodString;
+    }, z.core.$strip>>;
+    score: z.ZodOptional<z.ZodObject<{
+        home: z.ZodNumber;
+        away: z.ZodNumber;
+    }, z.core.$strip>>;
+    phaseEndsAt: z.ZodOptional<z.ZodString>;
+    startedAt: z.ZodOptional<z.ZodString>;
+    durationSeconds: z.ZodOptional<z.ZodNumber>;
+    overtimeSeconds: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+export type DisplayState = z.infer<typeof displayStateSchema>;

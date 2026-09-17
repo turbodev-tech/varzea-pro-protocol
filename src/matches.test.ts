@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { apiLinkMessages, hubConfigSchema } from './api-link';
-import { scheduledMatchSchema, type ScheduledMatch } from './matches';
+import { scheduledMatchSchema, type ScheduledMatch, displayStateSchema } from './matches';
+import { peripheralLinkMessages } from './peripheral-link';
 
 const match: ScheduledMatch = {
   id: '6f1d7c1e-3f0a-4a51-9c55-0d5b1b1a2f10',
@@ -115,5 +116,44 @@ describe('api link match messages', () => {
 
   it('no longer controls recording per camera', () => {
     assert.equal('api.recording.set' in apiLinkMessages, false);
+  });
+});
+
+describe('placar link match messages', () => {
+  it('draws a live match', () => {
+    const state = {
+      mode: 'LIVE' as const,
+      arenaName: 'Arena Várzea',
+      home: match.home,
+      away: match.away,
+      score: { home: 2, away: 1 },
+      startedAt: '2026-09-20T22:04:10.000Z',
+      durationSeconds: 3600,
+      overtimeSeconds: 300,
+    };
+    assert.deepEqual(displayStateSchema.parse(state), state);
+    assert.equal(peripheralLinkMessages['hub.display'].reply, null);
+  });
+
+  it('draws idle with only the arena name', () => {
+    assert.equal(displayStateSchema.safeParse({ mode: 'IDLE', arenaName: 'Arena' }).success, true);
+  });
+
+  it('rejects an unknown mode', () => {
+    assert.equal(displayStateSchema.safeParse({ mode: 'PAUSED', arenaName: 'Arena' }).success, false);
+  });
+
+  it('asks the hub to kick off, with the age of the press', () => {
+    const spec = peripheralLinkMessages['peripheral.match.start'];
+    assert.deepEqual(spec.payload.parse({ clientEventId: 's-1', ageMs: 1200 }), {
+      clientEventId: 's-1',
+      ageMs: 1200,
+    });
+    assert.equal(spec.payload.safeParse({ clientEventId: 's-1', ageMs: -1 }).success, false);
+    assert.deepEqual(spec.reply.parse({ started: false }), { started: false });
+    assert.deepEqual(spec.reply.parse({ matchId: match.id, started: true }), {
+      matchId: match.id,
+      started: true,
+    });
   });
 });

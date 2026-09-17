@@ -49,3 +49,29 @@ export const matchScheduleSchema = z.object({
   matches: z.array(scheduledMatchSchema),
 });
 export type MatchSchedule = z.infer<typeof matchScheduleSchema>;
+
+/** What the placar is showing. */
+export const displayModeSchema = z.enum(['IDLE', 'WARMUP', 'LIVE', 'OVERTIME', 'ENDED']);
+export type DisplayMode = z.infer<typeof displayModeSchema>;
+
+/**
+ * Everything the placar needs to draw, sent whole on every change.
+ *
+ * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
+ * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
+ * IDLE shows `arenaName` and the time of day.
+ */
+export const displayStateSchema = z.object({
+  mode: displayModeSchema,
+  arenaName: z.string(),
+  home: matchSideSchema.optional(),
+  away: matchSideSchema.optional(),
+  score: z
+    .object({ home: z.number().int().nonnegative(), away: z.number().int().nonnegative() })
+    .optional(),
+  phaseEndsAt: z.string().optional(),
+  startedAt: z.string().optional(),
+  durationSeconds: z.number().int().positive().optional(),
+  overtimeSeconds: z.number().int().nonnegative().optional(),
+});
+export type DisplayState = z.infer<typeof displayStateSchema>;

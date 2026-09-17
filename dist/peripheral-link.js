@@ -4,6 +4,7 @@ exports.peripheralLinkMessages = void 0;
 const zod_1 = require("zod");
 const envelope_1 = require("./envelope");
 const shared_1 = require("./shared");
+const matches_1 = require("./matches");
 /**
  * The LAN link between field peripherals and the hub. Peripherals are the
  * WebSocket clients; the hub is the server. `peripheral.*` is sent by a
@@ -47,7 +48,20 @@ exports.peripheralLinkMessages = {
     }), zod_1.z.object({ clientEventId: zod_1.z.string() })),
     /** Keeps the hub's view of this peripheral marked online. */
     'peripheral.heartbeat': (0, envelope_1.define)(zod_1.z.object({}), zod_1.z.object({ hubTime: zod_1.z.string() })),
+    /**
+     * Highlight held for 3 seconds: kick off the match in warmup.
+     *
+     * Queued like a goal, with `ageMs` for the same reason. The hub starts the
+     * match that was in warmup at `now − ageMs`. `started: false` means there
+     * was none, or it had already kicked off, and the placar shows SEM PARTIDA.
+     */
+    'peripheral.match.start': (0, envelope_1.define)(zod_1.z.object({
+        clientEventId: zod_1.z.string().min(1),
+        ageMs: zod_1.z.number().int().nonnegative(),
+    }), zod_1.z.object({ matchId: zod_1.z.string().optional(), started: zod_1.z.boolean() })),
     // ── hub → peripheral ───────────────────────────────────────────────────────
     /** Relayed from `api.peripheral.command`. The reply travels back up unchanged. */
     'hub.command': (0, envelope_1.define)(zod_1.z.object({ command: zod_1.z.string().min(1), args: shared_1.dataSchema.optional() }), zod_1.z.object({ result: zod_1.z.unknown() })),
+    /** What to draw. Sent on every change and right after `peripheral.connected`. */
+    'hub.display': (0, envelope_1.define)(matches_1.displayStateSchema, null),
 };

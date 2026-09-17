@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { define, type PayloadOf, type ReplyOf } from './envelope';
 import { dataSchema, peripheralTypeSchema } from './shared';
+import { displayStateSchema } from './matches';
 
 /**
  * The LAN link between field peripherals and the hub. Peripherals are the
@@ -58,6 +59,21 @@ export const peripheralLinkMessages = {
     z.object({ hubTime: z.string() }),
   ),
 
+  /**
+   * Highlight held for 3 seconds: kick off the match in warmup.
+   *
+   * Queued like a goal, with `ageMs` for the same reason. The hub starts the
+   * match that was in warmup at `now − ageMs`. `started: false` means there
+   * was none, or it had already kicked off, and the placar shows SEM PARTIDA.
+   */
+  'peripheral.match.start': define(
+    z.object({
+      clientEventId: z.string().min(1),
+      ageMs: z.number().int().nonnegative(),
+    }),
+    z.object({ matchId: z.string().optional(), started: z.boolean() }),
+  ),
+
   // ── hub → peripheral ───────────────────────────────────────────────────────
 
   /** Relayed from `api.peripheral.command`. The reply travels back up unchanged. */
@@ -65,6 +81,9 @@ export const peripheralLinkMessages = {
     z.object({ command: z.string().min(1), args: dataSchema.optional() }),
     z.object({ result: z.unknown() }),
   ),
+
+  /** What to draw. Sent on every change and right after `peripheral.connected`. */
+  'hub.display': define(displayStateSchema, null),
 } as const;
 
 export type PeripheralLinkMessages = typeof peripheralLinkMessages;

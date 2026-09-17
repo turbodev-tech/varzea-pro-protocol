@@ -49,6 +49,20 @@ export declare const peripheralLinkMessages: {
     readonly 'peripheral.heartbeat': import("./envelope").MessageSpec<z.ZodObject<{}, z.core.$strip>, z.ZodObject<{
         hubTime: z.ZodString;
     }, z.core.$strip>>;
+    /**
+     * Highlight held for 3 seconds: kick off the match in warmup.
+     *
+     * Queued like a goal, with `ageMs` for the same reason. The hub starts the
+     * match that was in warmup at `now − ageMs`. `started: false` means there
+     * was none, or it had already kicked off, and the placar shows SEM PARTIDA.
+     */
+    readonly 'peripheral.match.start': import("./envelope").MessageSpec<z.ZodObject<{
+        clientEventId: z.ZodString;
+        ageMs: z.ZodNumber;
+    }, z.core.$strip>, z.ZodObject<{
+        matchId: z.ZodOptional<z.ZodString>;
+        started: z.ZodBoolean;
+    }, z.core.$strip>>;
     /** Relayed from `api.peripheral.command`. The reply travels back up unchanged. */
     readonly 'hub.command': import("./envelope").MessageSpec<z.ZodObject<{
         command: z.ZodString;
@@ -56,6 +70,35 @@ export declare const peripheralLinkMessages: {
     }, z.core.$strip>, z.ZodObject<{
         result: z.ZodUnknown;
     }, z.core.$strip>>;
+    /** What to draw. Sent on every change and right after `peripheral.connected`. */
+    readonly 'hub.display': import("./envelope").MessageSpec<z.ZodObject<{
+        mode: z.ZodEnum<{
+            LIVE: "LIVE";
+            IDLE: "IDLE";
+            WARMUP: "WARMUP";
+            OVERTIME: "OVERTIME";
+            ENDED: "ENDED";
+        }>;
+        arenaName: z.ZodString;
+        home: z.ZodOptional<z.ZodObject<{
+            name: z.ZodString;
+            shortName: z.ZodString;
+            color: z.ZodString;
+        }, z.core.$strip>>;
+        away: z.ZodOptional<z.ZodObject<{
+            name: z.ZodString;
+            shortName: z.ZodString;
+            color: z.ZodString;
+        }, z.core.$strip>>;
+        score: z.ZodOptional<z.ZodObject<{
+            home: z.ZodNumber;
+            away: z.ZodNumber;
+        }, z.core.$strip>>;
+        phaseEndsAt: z.ZodOptional<z.ZodString>;
+        startedAt: z.ZodOptional<z.ZodString>;
+        durationSeconds: z.ZodOptional<z.ZodNumber>;
+        overtimeSeconds: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>, null>;
 };
 export type PeripheralLinkMessages = typeof peripheralLinkMessages;
 export type PeripheralLinkType = keyof PeripheralLinkMessages;
