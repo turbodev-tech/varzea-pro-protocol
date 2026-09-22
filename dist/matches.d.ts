@@ -103,11 +103,30 @@ export declare const displayModeSchema: z.ZodEnum<{
 }>;
 export type DisplayMode = z.infer<typeof displayModeSchema>;
 /**
+ * The next booked match, sent with IDLE so the placar can count down to it.
+ * `startsAt` is when warmup begins, on the hub's corrected clock.
+ */
+export declare const nextMatchSchema: z.ZodObject<{
+    startsAt: z.ZodString;
+    home: z.ZodOptional<z.ZodObject<{
+        name: z.ZodString;
+        shortName: z.ZodString;
+        color: z.ZodString;
+    }, z.core.$strip>>;
+    away: z.ZodOptional<z.ZodObject<{
+        name: z.ZodString;
+        shortName: z.ZodString;
+        color: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type NextMatch = z.infer<typeof nextMatchSchema>;
+/**
  * Everything the placar needs to draw, sent whole on every change.
  *
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ * IDLE may carry `nextMatch`; the placar then counts down to its `startsAt`.
  *
  * Every absolute time here is on the hub's corrected clock — the offset the
  * placar learns from `hubTime` in the `peripheral.connected` and
@@ -141,5 +160,18 @@ export declare const displayStateSchema: z.ZodObject<{
     startedAt: z.ZodOptional<z.ZodString>;
     durationSeconds: z.ZodOptional<z.ZodNumber>;
     overtimeSeconds: z.ZodOptional<z.ZodNumber>;
+    nextMatch: z.ZodOptional<z.ZodObject<{
+        startsAt: z.ZodString;
+        home: z.ZodOptional<z.ZodObject<{
+            name: z.ZodString;
+            shortName: z.ZodString;
+            color: z.ZodString;
+        }, z.core.$strip>>;
+        away: z.ZodOptional<z.ZodObject<{
+            name: z.ZodString;
+            shortName: z.ZodString;
+            color: z.ZodString;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
 }, z.core.$strip>;
 export type DisplayState = z.infer<typeof displayStateSchema>;

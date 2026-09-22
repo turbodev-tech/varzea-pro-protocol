@@ -71,11 +71,23 @@ export const displayModeSchema = z.enum(['IDLE', 'WARMUP', 'LIVE', 'OVERTIME', '
 export type DisplayMode = z.infer<typeof displayModeSchema>;
 
 /**
+ * The next booked match, sent with IDLE so the placar can count down to it.
+ * `startsAt` is when warmup begins, on the hub's corrected clock.
+ */
+export const nextMatchSchema = z.object({
+  startsAt: z.string(),
+  home: matchSideSchema.optional(),
+  away: matchSideSchema.optional(),
+});
+export type NextMatch = z.infer<typeof nextMatchSchema>;
+
+/**
  * Everything the placar needs to draw, sent whole on every change.
  *
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ * IDLE may carry `nextMatch`; the placar then counts down to its `startsAt`.
  *
  * Every absolute time here is on the hub's corrected clock — the offset the
  * placar learns from `hubTime` in the `peripheral.connected` and
@@ -94,5 +106,6 @@ export const displayStateSchema = z.object({
   startedAt: z.string().optional(),
   durationSeconds: z.number().int().positive().optional(),
   overtimeSeconds: z.number().int().nonnegative().optional(),
+  nextMatch: nextMatchSchema.optional(),
 });
 export type DisplayState = z.infer<typeof displayStateSchema>;

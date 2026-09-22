@@ -102,6 +102,19 @@ export declare const peripheralLinkMessages: {
         startedAt: z.ZodOptional<z.ZodString>;
         durationSeconds: z.ZodOptional<z.ZodNumber>;
         overtimeSeconds: z.ZodOptional<z.ZodNumber>;
+        nextMatch: z.ZodOptional<z.ZodObject<{
+            startsAt: z.ZodString;
+            home: z.ZodOptional<z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>>;
+            away: z.ZodOptional<z.ZodObject<{
+                name: z.ZodString;
+                shortName: z.ZodString;
+                color: z.ZodString;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
     }, z.core.$strip>, null>;
 };
 export type PeripheralLinkMessages = typeof peripheralLinkMessages;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.displayStateSchema = exports.displayModeSchema = exports.matchScheduleSchema = exports.scheduledMatchSchema = exports.matchStatusSchema = exports.matchSideSchema = void 0;
+exports.displayStateSchema = exports.nextMatchSchema = exports.displayModeSchema = exports.matchScheduleSchema = exports.scheduledMatchSchema = exports.matchStatusSchema = exports.matchSideSchema = void 0;
 const zod_1 = require("zod");
 /**
  * Matches, as the field sees them. Only the platform creates a match; the hub
@@ -61,11 +61,21 @@ exports.matchScheduleSchema = zod_1.z.object({
 /** What the placar is showing. */
 exports.displayModeSchema = zod_1.z.enum(['IDLE', 'WARMUP', 'LIVE', 'OVERTIME', 'ENDED']);
 /**
+ * The next booked match, sent with IDLE so the placar can count down to it.
+ * `startsAt` is when warmup begins, on the hub's corrected clock.
+ */
+exports.nextMatchSchema = zod_1.z.object({
+    startsAt: zod_1.z.string(),
+    home: exports.matchSideSchema.optional(),
+    away: exports.matchSideSchema.optional(),
+});
+/**
  * Everything the placar needs to draw, sent whole on every change.
  *
  * WARMUP counts down to `phaseEndsAt`. LIVE counts up from `startedAt`.
  * OVERTIME shows the time past `startedAt + durationSeconds` as `+mm:ss`.
  * IDLE shows `arenaName` and the time of day.
+ * IDLE may carry `nextMatch`; the placar then counts down to its `startsAt`.
  *
  * Every absolute time here is on the hub's corrected clock — the offset the
  * placar learns from `hubTime` in the `peripheral.connected` and
@@ -84,4 +94,5 @@ exports.displayStateSchema = zod_1.z.object({
     startedAt: zod_1.z.string().optional(),
     durationSeconds: zod_1.z.number().int().positive().optional(),
     overtimeSeconds: zod_1.z.number().int().nonnegative().optional(),
+    nextMatch: exports.nextMatchSchema.optional(),
 });

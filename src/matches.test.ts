@@ -143,6 +143,26 @@ describe('placar link match messages', () => {
     assert.equal(displayStateSchema.safeParse({ mode: 'PAUSED', arenaName: 'Arena' }).success, false);
   });
 
+  it('lets an idle display point at the next booked match', () => {
+    const state = {
+      mode: 'IDLE',
+      arenaName: 'Arena',
+      nextMatch: {
+        startsAt: '2026-10-06T22:00:00.000Z',
+        home: { name: 'Unidos', shortName: 'UNIDOS', color: '#e11d48' },
+        away: { name: 'Time 2', shortName: 'TIME 2', color: '#2563eb' },
+      },
+    };
+    assert.deepEqual(displayStateSchema.parse(state), state);
+  });
+
+  it('requires a start time on the next match', () => {
+    assert.equal(
+      displayStateSchema.safeParse({ mode: 'IDLE', arenaName: 'Arena', nextMatch: {} }).success,
+      false,
+    );
+  });
+
   it('asks the hub to kick off, with the age of the press', () => {
     const spec = peripheralLinkMessages['peripheral.match.start'];
     assert.deepEqual(spec.payload.parse({ clientEventId: 's-1', ageMs: 1200 }), {
