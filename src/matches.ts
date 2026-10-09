@@ -4,9 +4,9 @@ import { z } from 'zod';
  * Matches, as the field sees them. Only the platform creates a match; the hub
  * receives the pitch's schedule and reports what happened on the field.
  *
- * A match's window is `startsAt` → warmup → regular time → overtime. Kickoff
- * (`startedAt`) ends the warmup early when someone presses start, and the
- * phases after it are measured from kickoff.
+ * A match's window is `startsAt` → warmup → regular time → overtime → end time
+ * (score held on the placar). Kickoff (`startedAt`) ends the warmup early when
+ * someone presses start, and the phases after it are measured from kickoff.
  */
 
 /**
@@ -49,6 +49,11 @@ export const scheduledMatchSchema = z.object({
   warmupSeconds: seconds,
   durationSeconds: z.number().int().positive(),
   overtimeSeconds: seconds,
+  /**
+   * How long the placar holds the final score and FIM after the game ends.
+   * Display only: recording and `hub.match.ended` are unaffected.
+   */
+  endTimeSeconds: seconds.default(180),
   /** Kickoff, once it happened. */
   startedAt: z.string().optional(),
   endedAt: z.string().optional(),

@@ -118,6 +118,7 @@ export declare const apiLinkMessages: {
             warmupSeconds: z.ZodNumber;
             durationSeconds: z.ZodNumber;
             overtimeSeconds: z.ZodNumber;
+            endTimeSeconds: z.ZodDefault<z.ZodNumber>;
             startedAt: z.ZodOptional<z.ZodString>;
             endedAt: z.ZodOptional<z.ZodString>;
             home: z.ZodObject<{
@@ -311,6 +312,7 @@ export declare const apiLinkMessages: {
             warmupSeconds: z.ZodNumber;
             durationSeconds: z.ZodNumber;
             overtimeSeconds: z.ZodNumber;
+            endTimeSeconds: z.ZodDefault<z.ZodNumber>;
             startedAt: z.ZodOptional<z.ZodString>;
             endedAt: z.ZodOptional<z.ZodString>;
             home: z.ZodObject<{

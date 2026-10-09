@@ -11,6 +11,7 @@ const match: ScheduledMatch = {
   warmupSeconds: 300,
   durationSeconds: 3600,
   overtimeSeconds: 0,
+  endTimeSeconds: 180,
   home: { name: 'Unidos da Vila', shortName: 'UNIDOS', color: '#e11d48' },
   away: { name: 'Time 2', shortName: 'TIME 2', color: '#2563eb' },
 };
@@ -41,6 +42,20 @@ describe('match schedule', () => {
 
   it('does not ship cancelled matches', () => {
     assert.equal(scheduledMatchSchema.safeParse({ ...match, status: 'CANCELLED' }).success, false);
+  });
+
+  it('defaults the end time hold to three minutes', () => {
+    const { endTimeSeconds: _omitted, ...withoutEndTime } = match;
+    assert.equal(scheduledMatchSchema.parse(withoutEndTime).endTimeSeconds, 180);
+  });
+
+  it('keeps an explicit end time, zero included', () => {
+    assert.equal(scheduledMatchSchema.parse({ ...match, endTimeSeconds: 0 }).endTimeSeconds, 0);
+    assert.equal(scheduledMatchSchema.parse({ ...match, endTimeSeconds: 600 }).endTimeSeconds, 600);
+  });
+
+  it('rejects a negative end time', () => {
+    assert.equal(scheduledMatchSchema.safeParse({ ...match, endTimeSeconds: -1 }).success, false);
   });
 });
 

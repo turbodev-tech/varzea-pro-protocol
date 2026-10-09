@@ -3,9 +3,9 @@ import { z } from 'zod';
  * Matches, as the field sees them. Only the platform creates a match; the hub
  * receives the pitch's schedule and reports what happened on the field.
  *
- * A match's window is `startsAt` → warmup → regular time → overtime. Kickoff
- * (`startedAt`) ends the warmup early when someone presses start, and the
- * phases after it are measured from kickoff.
+ * A match's window is `startsAt` → warmup → regular time → overtime → end time
+ * (score held on the placar). Kickoff (`startedAt`) ends the warmup early when
+ * someone presses start, and the phases after it are measured from kickoff.
  */
 /**
  * One side, as the placar draws it.
@@ -48,6 +48,7 @@ export declare const scheduledMatchSchema: z.ZodObject<{
     warmupSeconds: z.ZodNumber;
     durationSeconds: z.ZodNumber;
     overtimeSeconds: z.ZodNumber;
+    endTimeSeconds: z.ZodDefault<z.ZodNumber>;
     startedAt: z.ZodOptional<z.ZodString>;
     endedAt: z.ZodOptional<z.ZodString>;
     home: z.ZodObject<{
@@ -78,6 +79,7 @@ export declare const matchScheduleSchema: z.ZodObject<{
         warmupSeconds: z.ZodNumber;
         durationSeconds: z.ZodNumber;
         overtimeSeconds: z.ZodNumber;
+        endTimeSeconds: z.ZodDefault<z.ZodNumber>;
         startedAt: z.ZodOptional<z.ZodString>;
         endedAt: z.ZodOptional<z.ZodString>;
         home: z.ZodObject<{
